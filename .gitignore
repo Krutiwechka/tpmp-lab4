@@ -1,0 +1,39 @@
+# Скомпилированные файлы
+bin/
+build/
+*.o
+*.exe
+*.out
+*.app
+
+# Файлы баз данных SQLite
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Отладочные файлы
+*.dSYM/
+*.gcno
+*.gcda
+*.gcov
+
+# Файлы покрытия кода (codecov)
+coverage/
+*.info
+
+# Редакторы и IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Временные файлы
+*.tmp
+*.log
+
+# Файлы конфигурации с секретами (если появятся)
+*.env
+config.local.h
