@@ -2,9 +2,9 @@ name: CI Build and Test
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, development ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, development ]
 
 jobs:
   build-and-test:
@@ -19,17 +19,47 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libcunit1 libcunit1-dev sqlite3 libsqlite3-dev lcov
 
-    - name: Compile project
-      run: make
+    - name: Create database schema
+      run: |
+        sqlite3 music_salon.db < schema.sql || true
+        sqlite3 music_salon.db < init_data.sql || true
+
+    - name: Compile project with coverage flags
+      run: |
+        mkdir -p build bin
+        gcc -Wall -Iincludes -fprofile-arcs -ftest-coverage -c src/auth.c -o build/auth.o
+        gcc -Wall -Iincludes -fprofile-arcs -ftest-coverage -c src/db.c -o build/db.o
+        gcc -Wall -Iincludes -fprofile-arcs -ftest-coverage -c src/cd.c -o build/cd.o
+        gcc -Wall -Iincludes -fprofile-arcs -ftest-coverage -c src/sale.c -o build/sale.o
+        gcc -Wall -Iincludes -fprofile-arcs -ftest-coverage -c src/report.c -o build/report.o
+        gcc -Wall -Iincludes -fprofile-arcs -ftest-coverage -c src/utils.c -o build/utils.o
+        gcc -Wall -Iincludes -fprofile-arcs -ftest-coverage -c src/main.c -o build/main.o
+        gcc -o bin/music_salon build/*.o -lsqlite3 -lcunit -fprofile-arcs -ftest-coverage
+
+    - name: Compile tests with coverage flags
+      run: |
+        mkdir -p build_tests
+        for test in tests/test_*.c; do
+          name=$(basename "$test" .c)
+          gcc -Wall -Iincludes -fprofile-arcs -ftest-coverage -c "$test" -o "build_tests/${name}.o"
+          gcc -o "tests/${name}" "build_tests/${name}.o" build/auth.o build/db.o build/cd.o build/sale.o build/report.o build/utils.o -lsqlite3 -lcunit -fprofile-arcs -ftest-coverage
+        done
 
     - name: Run unit tests
-      run: make test
+      run: |
+        for t in tests/test_*; do
+          if [ -f "$t" ] && [ ! "$t" = "tests/test_*.c" ]; then
+            echo "Running $t"
+            ./$t
+          fi
+        done
 
     - name: Generate coverage report
       run: |
         gcov -pb src/*.c
         lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch
-        lcov --remove coverage.info 'tests/*' '/usr/*' --output-file coverage.info
+        lcov --remove coverage.info 'tests/*' '/usr/*' '*/includes/*' --output-file coverage.info
+        genhtml coverage.info --output-directory coverage
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
