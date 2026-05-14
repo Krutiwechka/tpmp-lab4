@@ -48,7 +48,7 @@ jobs:
     - name: Run unit tests
       run: |
         for t in tests/test_*; do
-          if [ -f "$t" ] && [ ! "$t" = "tests/test_*.c" ]; then
+          if [ -f "$t" ] && [ ! "$t" = "tests/test_*.c" ] && [ ! "${t##*.}" = "c" ]; then
             echo "Running $t"
             ./$t
           fi
