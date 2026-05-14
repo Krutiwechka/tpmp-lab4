@@ -14,15 +14,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install dependencies (CUnit, SQLite, lcov)
+    - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libcunit1 libcunit1-dev sqlite3 libsqlite3-dev lcov gcovr
-
-    - name: Create database schema
-      run: |
-        sqlite3 music_salon.db < schema.sql
-        sqlite3 music_salon.db < init_data.sql
+        sudo apt-get install -y libcunit1 libcunit1-dev sqlite3 libsqlite3-dev lcov
 
     - name: Compile project
       run: make
@@ -30,23 +25,17 @@ jobs:
     - name: Run unit tests
       run: make test
 
-    - name: Generate coverage report (gcov)
+    - name: Generate coverage report
       run: |
-        make coverage
-        gcovr --gcov-executable gcov --root . --xml -o coverage.xml
-        gcovr --gcov-executable gcov --root . --html -o coverage.html
+        gcov -pb src/*.c
+        lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch
+        lcov --remove coverage.info 'tests/*' '/usr/*' --output-file coverage.info
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        files: ./coverage.xml
+        files: ./coverage.info
         flags: unittests
-        name: codecov-umbrella
+        name: music-salon-coverage
         fail_ci_if_error: false
-
-    - name: Upload coverage report as artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-report
-        path: coverage.html
