@@ -19,11 +19,6 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libcunit1 libcunit1-dev sqlite3 libsqlite3-dev lcov
 
-    - name: Create database schema
-      run: |
-        sqlite3 music_salon.db < schema.sql
-        sqlite3 music_salon.db < init_data.sql
-
     - name: Compile project with coverage
       run: |
         mkdir -p build bin
@@ -46,24 +41,17 @@ jobs:
         for t in tests/test_*; do
           if [ -f "$t" ] && [ ! "$t" = "tests/test_*.c" ] && [ ! "${t##*.}" = "c" ]; then
             echo "Running $t"
-            ./$t || echo "Test $t failed but continuing"
+            ./$t
           fi
         done
 
     - name: Generate coverage report
       run: |
-        # Принудительно создаём .gcda файлы, если их нет
-        find . -name "*.gcno" -exec touch {}.gcda \; 2>/dev/null || true
-        
-        # Запускаем gcov на всех исходниках
         gcov -pb src/*.c 2>/dev/null || true
-        
-        # Собираем coverage
         lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch,gcov,source 2>/dev/null || true
         lcov --remove coverage.info 'tests/*' '/usr/*' '*/includes/*' '*/build/*' --output-file coverage.info 2>/dev/null || true
         genhtml coverage.info --output-directory coverage 2>/dev/null || true
-        
-        echo "Coverage report generated (may be partial)"
+        echo "Coverage report generated"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
