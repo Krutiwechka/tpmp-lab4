@@ -27,13 +27,14 @@ jobs:
         done
         gcc -o bin/music_salon build/*.o -lsqlite3 -lcunit -fprofile-arcs -ftest-coverage
 
-    - name: Compile tests with coverage
+    - name: Compile tests with coverage (excluding main.o)
       run: |
         mkdir -p build_tests
         for test in tests/test_*.c; do
           name=$(basename "$test" .c)
           gcc -Wall -Iincludes -fprofile-arcs -ftest-coverage -c "$test" -o "build_tests/${name}.o"
-          gcc -o "tests/${name}" "build_tests/${name}.o" build/*.o -lsqlite3 -lcunit -fprofile-arcs -ftest-coverage
+          # Исключаем main.o при линковке тестов
+          gcc -o "tests/${name}" "build_tests/${name}.o" build/auth.o build/db.o build/cd.o build/sale.o build/report.o build/utils.o -lsqlite3 -lcunit -fprofile-arcs -ftest-coverage
         done
 
     - name: Run unit tests
