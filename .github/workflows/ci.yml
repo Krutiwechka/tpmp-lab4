@@ -1,19 +1,52 @@
-name: C CI
+name: CI Build and Test
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-    - name: Install sqlite3
-      run: sudo apt-get install -y libsqlite3-dev
+    - name: Install dependencies (CUnit, SQLite, lcov)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libcunit1 libcunit1-dev sqlite3 libsqlite3-dev lcov gcovr
 
-    - name: Build
+    - name: Create database schema
+      run: |
+        sqlite3 music_salon.db < schema.sql
+        sqlite3 music_salon.db < init_data.sql
+
+    - name: Compile project
       run: make
 
-    - name: Run (smoke test)
-      run: echo "Build done"
+    - name: Run unit tests
+      run: make test
+
+    - name: Generate coverage report (gcov)
+      run: |
+        make coverage
+        gcovr --gcov-executable gcov --root . --xml -o coverage.xml
+        gcovr --gcov-executable gcov --root . --html -o coverage.html
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Upload coverage report as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage.html
