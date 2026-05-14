@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <sqlite3.h>
 #include "report.h"
 #include "db.h"
@@ -61,4 +62,53 @@ void report_by_author(sqlite3* db) {
         "JOIN sales s ON cd.id = s.cd_id "
         "GROUP BY mp.author;";
     sqlite3_exec(db, sql, db_callback, 0, 0);
+}
+
+void generate_period_report(sqlite3* db, const char* start_date, const char* end_date) {
+    db_execute(db, "DELETE FROM period_report;");
+    
+    char sql[1024];
+    sprintf(sql,
+        "INSERT INTO period_report (cd_id, cd_code, total_arrived, total_sold, report_start_date, report_end_date) "
+        "SELECT cd.id, cd.code, "
+        "       COALESCE((SELECT SUM(quantity) FROM arrivals WHERE cd_id=cd.id AND operation_date BETWEEN '%s' AND '%s'), 0), "
+        "       COALESCE((SELECT SUM(quantity) FROM sales WHERE cd_id=cd.id AND operation_date BETWEEN '%s' AND '%s'), 0), "
+        "       '%s', '%s' "
+        "FROM compact_discs cd;",
+        start_date, end_date, start_date, end_date, start_date, end_date);
+    
+    db_execute(db, sql);
+    printf("Period report generated for %s to %s\n", start_date, end_date);
+    
+    sqlite3_exec(db, "SELECT cd_id, cd_code, total_arrived, total_sold FROM period_report;", period_report_callback, 0, 0);
+}
+
+int period_report_callback(void* data, int argc, char** argv, char** col_names) {
+    printf("CD %s: arrived=%s, sold=%s\n", argv[1], argv[2], argv[3]);
+    return 0;
+}
+
+void report_sales_by_cd_period(sqlite3* db) {
+    int cd_id;
+    char start_date[11], end_date[11];
+    printf("Enter CD id: ");
+    scanf("%d", &cd_id);
+    printf("Start date (YYYY-MM-DD): ");
+    scanf("%10s", start_date);
+    printf("End date (YYYY-MM-DD): ");
+    scanf("%10s", end_date);
+    
+    char sql[512];
+    sprintf(sql,
+        "SELECT SUM(s.quantity) AS total_quantity, SUM(s.quantity * cd.price) AS total_value "
+        "FROM sales s JOIN compact_discs cd ON s.cd_id = cd.id "
+        "WHERE s.cd_id = %d AND s.operation_date BETWEEN '%s' AND '%s';",
+        cd_id, start_date, end_date);
+    
+    sqlite3_exec(db, sql, report_sales_callback, 0, 0);
+}
+
+int report_sales_callback(void* data, int argc, char** argv, char** col_names) {
+    printf("Quantity sold: %s, Total value: %s\n", argv[0], argv[1]);
+    return 0;
 }
